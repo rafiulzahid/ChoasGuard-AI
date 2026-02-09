@@ -45,8 +45,6 @@ pip install -r requirements.txt
 Run the application:
 python main.py
 
-Open in browser:
-http://127.0.0.1:5000
 
 ---
 
@@ -79,7 +77,10 @@ Python version: 3.11
 Start command: python main.py  
 MODEL_DIR: ./trained_xlmr_model
 
----
+---**
+
+## Frontened
+Link: https://rafiulzahid.github.io/ChoasGuard-AI/ 
 
 ## Common Issues
 
