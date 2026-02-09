@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ChaosGuard AI Dashboard</title>
+
+  <!-- Simple modern styling (no external CSS needed) -->
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#111a2d;
+      --muted:#9fb0d0;
+      --text:#eaf0ff;
+      --accent:#7aa2ff;
+      --good:#39d98a;
+      --bad:#ff5c7a;
+      --warn:#ffcc66;
+      --border:rgba(255,255,255,0.08);
+    }
+    body{ margin:0; font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background: radial-gradient(1000px 600px at 20% 10%, rgba(122,162,255,0.18), transparent 60%),
+                  radial-gradient(900px 500px at 90% 30%, rgba(255,92,122,0.12), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{ max-width:1200px; margin:28px auto; padding:0 16px; }
+    .topbar{ display:flex; gap:14px; align-items:flex-end; justify-content:space-between; }
+    h1{ margin:0; font-size:28px; letter-spacing:0.2px; }
+    .sub{ margin-top:6px; color:var(--muted); font-size:14px; }
+
+    .grid{ display:grid; grid-template-columns: 1.1fr 0.9fr; gap:16px; margin-top:18px; }
+    @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      padding:16px;
+    }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row > *{ flex:1; }
+    label{ font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+    textarea{
+      width:100%; height:140px; resize:vertical;
+      border-radius:12px; border:1px solid var(--border);
+      background: rgba(0,0,0,0.25); color:var(--text);
+      padding:12px; font-size:15px; outline:none;
+    }
+    input, select{
+      width:100%;
+      border-radius:12px; border:1px solid var(--border);
+      background: rgba(0,0,0,0.25); color:var(--text);
+      padding:10px 12px; outline:none;
+    }
+    button{
+      background: linear-gradient(135deg, rgba(122,162,255,0.95), rgba(122,162,255,0.65));
+      border:none; color:#061024; font-weight:700;
+      padding:12px 14px; border-radius:12px;
+      cursor:pointer; transition: transform .05s ease;
+    }
+    button:active{ transform: scale(0.99); }
+    .pill{
+      font-size:12px; padding:6px 10px; border-radius:999px;
+      border:1px solid var(--border); color:var(--muted);
+      background: rgba(0,0,0,0.22);
+    }
+
+    table{ width:100%; border-collapse: collapse; margin-top:10px; }
+    th, td{ padding:10px; border-bottom:1px solid var(--border); font-size:13px; }
+    th{ text-align:left; color:var(--muted); font-weight:600; }
+    .tag{ padding:5px 10px; border-radius:999px; font-weight:700; font-size:12px; display:inline-block; }
+    .tag.good{ background: rgba(57,217,138,0.18); color: var(--good); }
+    .tag.bad{ background: rgba(255,92,122,0.18); color: var(--bad); }
+    .bar{
+      height:10px; border-radius:999px;
+      background: rgba(255,255,255,0.08);
+      overflow:hidden;
+    }
+    .bar > div{
+      height:100%; border-radius:999px;
+      background: linear-gradient(90deg, rgba(122,162,255,1), rgba(255,92,122,0.9));
+      width:0%;
+    }
+
+    canvas{ width:100% !important; height:320px !important; }
+    .section-title{ margin:0 0 8px 0; font-size:16px; }
+
+    .xai{
+      margin-top:14px; padding:12px;
+      border-radius:12px; border:1px solid var(--border);
+      background: rgba(0,0,0,0.18);
+    }
+    .tokens{ line-height:2.4; font-size:16px; }
+    .tok{
+      display:inline-block; padding:2px 8px; margin:2px;
+      border-radius:10px; color: #fff;
+    }
+    .legend{ margin-top:10px; font-size:13px; color:var(--muted); }
+    .muted{ color: var(--muted); }
+    .small{ font-size:12px; }
+    .error{ color: var(--bad); font-weight:700; }
+  </style>
+
+  <!-- Chart.js (single external script for beautiful charts) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>🛡️ ChaosGuard AI Dashboard</h1>
+        <div class="sub">One-page demo: XLM-R multi-label toxicity + uncertainty (MC Dropout) + XAI (Integrated Gradients).</div>
+      </div>
+      <div class="row">
+        <span class="pill">No data stored</span>
+        <span class="pill">Bangla/Banglish/English</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Left: input + controls -->
+      <div class="card">
+        <h3 class="section-title">Input</h3>
+        <label for="text">Text</label>
+        <textarea id="text">আপনি একটা বাজে মানুষ</textarea>
+
+        <div class="row" style="margin-top:12px;">
+          <div>
+            <label>Threshold</label>
+            <input id="threshold" type="number" step="0.01" min="0" max="1" value="0.50">
+          </div>
+          <div>
+            <label>Max length</label>
+            <input id="max_length" type="number" step="1" min="32" max="512" value="192">
+          </div>
+          <div>
+            <label>MC samples</label>
+            <input id="mc_samples" type="number" step="1" min="5" max="200" value="20">
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <button id="analyzeBtn">Analyze</button>
+          <span id="status" class="muted small"></span>
+          <span id="err" class="error small"></span>
+        </div>
+
+        <div style="margin-top:16px;">
+          <h3 class="section-title">Predictions</h3>
+          <div class="muted small">Probability, uncertainty (std), entropy, and toxic flag.</div>
+          <div id="tableWrap"></div>
+        </div>
+      </div>
+
+      <!-- Right: charts + XAI -->
+      <div class="card">
+        <h3 class="section-title">Visuals</h3>
+        <div class="muted small">Charts update after analysis.</div>
+
+        <div style="margin-top:10px;">
+          <canvas id="probChart"></canvas>
+        </div>
+
+        <div style="margin-top:14px;">
+          <canvas id="uncChart"></canvas>
+        </div>
+
+        <div class="xai">
+          <div class="row" style="align-items:flex-end;">
+            <div>
+              <label>Explain label</label>
+              <select id="xaiLabel">
+                {% for l in labels %}
+                <option value="{{l}}" {% if l == "Insult-based" %}selected{% endif %}>{{l}}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label>IG steps</label>
+              <input id="ig_steps" type="number" min="10" max="200" value="32">
+            </div>
+            <div style="flex:0;">
+              <button id="explainBtn">Explain</button>
+            </div>
+          </div>
+
+          <div id="xaiMeta" class="muted small" style="margin-top:10px;"></div>
+          <div id="tokens" class="tokens" style="margin-top:8px;"></div>
+          <div class="legend">
+            <b>Legend:</b> <span class="tok" style="background:rgba(255,92,122,0.55)">Red</span> supports label,
+            <span class="tok" style="background:rgba(122,162,255,0.55)">Blue</span> opposes label.
+            <span class="muted">(hover tokens to see score)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub" style="margin-top:16px;">
+      Disclaimer: This is a research prototype and may produce incorrect predictions. Do not use as the sole basis for moderation decisions.
+    </div>
+  </div>
+
+<script>
+  const el = (id) => document.getElementById(id);
+
+  let probChart, uncChart;
+  function initCharts(){
+    const ctx1 = el("probChart").getContext("2d");
+    const ctx2 = el("uncChart").getContext("2d");
+
+    probChart = new Chart(ctx1, {
+      type: "bar",
+      data: { labels: [], datasets: [{ label: "Probability", data: [] }] },
+      options: {
+        responsive:true,
+        plugins:{ legend:{ display:true } },
+        scales:{ y:{ min:0, max:1 } }
+      }
+    });
+
+    uncChart = new Chart(ctx2, {
+      type: "bar",
+      data: { labels: [], datasets: [{ label: "Uncertainty (Std)", data: [] }] },
+      options: {
+        responsive:true,
+        plugins:{ legend:{ display:true } },
+        scales:{ y:{ beginAtZero:true } }
+      }
+    });
+  }
+
+  function setStatus(msg){ el("status").textContent = msg; }
+  function setError(msg){ el("err").textContent = msg; }
+
+  function renderTable(results){
+    let html = `<table>
+      <thead>
+        <tr>
+          <th>Label</th><th>Prob</th><th>Unc</th><th>Entropy</th><th>Toxic</th>
+        </tr>
+      </thead><tbody>`;
+
+    for(const r of results){
+      const pct = Math.round(r.probability * 100);
+      html += `<tr>
+        <td><b>${r.label}</b><div class="bar" title="${pct}%"><div style="width:${pct}%"></div></div></td>
+        <td>${r.probability.toFixed(4)}</td>
+        <td>${r.uncertainty.toFixed(6)}</td>
+        <td>${r.entropy.toFixed(4)}</td>
+        <td>${r.toxic ? `<span class="tag bad">Toxic</span>` : `<span class="tag good">Safe</span>`}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+    el("tableWrap").innerHTML = html;
+  }
+
+  function updateCharts(results){
+    // keep order as returned (already sorted by backend)
+    const labels = results.map(r => r.label);
+    const probs  = results.map(r => r.probability);
+    const uncs   = results.map(r => r.uncertainty);
+
+    probChart.data.labels = labels;
+    probChart.data.datasets[0].data = probs;
+    probChart.update();
+
+    uncChart.data.labels = labels;
+    uncChart.data.datasets[0].data = uncs;
+    uncChart.update();
+  }
+
+  function renderTokens(tokens){
+    const parts = tokens.map(t => {
+      const score = Math.max(-1, Math.min(1, t.score));
+      const alpha = Math.min(0.85, Math.max(0.10, Math.abs(score)));
+      const bg = score >= 0
+        ? `rgba(255, 92, 122, ${alpha})`
+        : `rgba(122, 162, 255, ${alpha})`;
+
+      // XLM-R uses ▁ for word boundary
+      const displayTok = (t.token || "").replaceAll("▁", " ");
+
+      return `<span class="tok" title="${score.toFixed(3)}" style="background:${bg}">${displayTok}</span>`;
+    });
+
+    el("tokens").innerHTML = parts.join(" ");
+  }
+
+  async function analyze(){
+    setError("");
+    setStatus("Analyzing...");
+    const text = el("text").value.trim();
+    if(!text){ setError("Enter some text."); setStatus(""); return; }
+
+    const payload = {
+      text,
+      threshold: parseFloat(el("threshold").value || "0.5"),
+      max_length: parseInt(el("max_length").value || "192"),
+      mc_samples: parseInt(el("mc_samples").value || "20")
+    };
+
+    try{
+      const res = await fetch("/api/analyze", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if(!res.ok){
+        setError(data.error || "Analyze failed");
+        setStatus("");
+        return;
+      }
+
+      renderTable(data.results);
+      updateCharts(data.results);
+      setStatus("Done ✅");
+    }catch(e){
+      setError("Network error");
+      setStatus("");
+    }
+  }
+
+  async function explain(){
+    setError("");
+    setStatus("Explaining...");
+    const text = el("text").value.trim();
+    if(!text){ setError("Enter some text."); setStatus(""); return; }
+
+    const payload = {
+      text,
+      label: el("xaiLabel").value,
+      max_length: parseInt(el("max_length").value || "192"),
+      ig_steps: parseInt(el("ig_steps").value || "32")
+    };
+
+    try{
+      const res = await fetch("/api/explain", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if(!res.ok){
+        setError(data.error || "Explain failed");
+        setStatus("");
+        return;
+      }
+
+      el("xaiMeta").innerHTML =
+        `<b>Label:</b> ${data.label} &nbsp; | &nbsp; <b>Prob:</b> ${data.probability.toFixed(4)} &nbsp; | &nbsp; <b>Delta:</b> ${data.delta.toFixed(6)}`;
+
+      renderTokens(data.tokens);
+      setStatus("Done ✅");
+    }catch(e){
+      setError("Network error");
+      setStatus("");
+    }
+  }
+
+  // Init
+  initCharts();
+  el("analyzeBtn").addEventListener("click", analyze);
+  el("explainBtn").addEventListener("click", explain);
+
+  // Auto-run once
+  analyze();
+</script>
+</body>
+</html>
